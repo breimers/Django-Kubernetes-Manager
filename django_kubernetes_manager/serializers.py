@@ -1,10 +1,11 @@
-from .models import (KubernetesBase, KubernetesContainer, KubernetesDeployment,
-                    KubernetesIngress, KubernetesJob,
-                    KubernetesMetadataObjBase, KubernetesNetworkingBase,
-                    KubernetesPodTemplate, KubernetesService, TargetCluster,
-                    KubernetesNamespace)
 from rest_framework import serializers
 
+from .models import (KubernetesBase, KubernetesConfigMap, KubernetesContainer,
+                     KubernetesDeployment, KubernetesIngress, KubernetesJob,
+                     KubernetesMetadataObjBase, KubernetesNamespace,
+                     KubernetesNetworkingBase, KubernetesPodTemplate,
+                     KubernetesService, KubernetesVolume,
+                     KubernetesVolumeMount, TargetCluster)
 
 
 class TargetClusterSerializer(serializers.HyperlinkedModelSerializer):
@@ -42,11 +43,36 @@ class KubernetesNetworkingBaseSerializer(KubernetesMetadataObjBaseSerializer):
 
 
 
+class KubernetesVolumeSerializer(KubernetesBaseSerializer):
+    class Meta:
+        model = KubernetesVolume
+        fields = KubernetesBaseSerializer.Meta.fields
+
+
+
+class KubernetesVolumeMountSerializer(KubernetesBaseSerializer):
+    class Meta:
+        model = KubernetesVolumeMount
+        fields = KubernetesBaseSerializer.Meta.fields + [
+            'mount_path', 'sub_path'
+        ]
+
+
+
 class KubernetesNamespaceSerializer(KubernetesMetadataObjBaseSerializer):
     class Meta:
         model = KubernetesNamespace
         fields = KubernetesMetadataObjBaseSerializer.Meta.fields + [
             'api_version', 'kind', 'exists'
+        ]
+
+
+
+class KubernetesConfigMapSerializer(KubernetesMetadataObjBaseSerializer):
+    class Meta:
+        model = KubernetesConfigMap
+        fields = KubernetesMetadataObjBaseSerializer.Meta.fields + [
+            'data', 'kind',
         ]
 
 

@@ -1,0 +1,46 @@
+version: 2.1
+orbs:
+  python: circleci/python@0.2.1
+jobs:
+  docs:
+    docker:
+      - image: curlimages/curl
+    steps:
+      - run:
+          command: |
+            curl -X POST -d "token=$RTD_TOKEN" https://readthedocs.org/api/v2/webhook/django-kubernetes-manager/117046/
+          name: trigger RTD build
+  build:
+    executor: python/default
+    steps:
+      - checkout
+      - python/load-cache
+      - python/install-deps
+      - python/save-cache
+      - run:
+          command: |
+            sed -i "s/TAG/$CIRCLE_TAG/g" setup.cfg
+          name: Setting version to Git Tag.
+      - run:
+          command: |
+            python setup.py sdist bdist_wheel
+          name: Building packages
+      - run:
+          command: |
+            python -m twine upload --repository-url https://upload.pypi.org/legacy/ -u $PYPI_USER -p $PYPI_PASS dist/*
+          name: Publishing to PyPi
+workflows:
+  main:
+    jobs:
+      - docs:
+          filters:
+            branches:
+              only: master
+            tags:
+              only: /^\d+\.\d+\.\d+$/
+      - build:
+          filters:
+            branches:
+              ignore: /.*/
+            tags:
+              only: /^\d+\.\d+\.\d+$/

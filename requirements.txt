@@ -1,0 +1,12 @@
+factory_boy
+faker
+kubernetes
+django
+psycopg2
+django_extensions
+drf-yasg
+djangorestframework
+twine
+setuptools
+sphinx_rtd_theme
+Sphinx

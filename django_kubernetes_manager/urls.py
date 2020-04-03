@@ -32,6 +32,10 @@ router.register(r'ingresses', views.KubernetesIngressViewSet)
 router.register(r'jobs', views.KubernetesJobViewSet)
 router.register(r'clusters', views.TargetClusterViewSet)
 router.register(r'namespaces', views.KubernetesNamespaceViewSet)
+router.register(r'configmaps', views.KubernetesConfigMapViewSet)
+router.register(r'volumes', views.KubernetesVolumeViewSet)
+router.register(r'mounts', views.KubernetesVolumeMountViewSet)
+
 
 urlpatterns = [
     path('api/', include(router.urls)),
