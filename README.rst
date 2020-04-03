@@ -4,25 +4,20 @@
    :alt: DjangoKubernetesManager
 
 
-Django Kubernetes Manager is an ongoing project to wrap the complexity of Kubernetes management in the simplicity of Django Rest Framework.
+Django Kubernetes Manager is an open source project to wrap the complexity of Kubernetes management in the simplicity of Django Rest Framework.
 
 License
 --------
-This project is license under the MIT license. Please see the license dir for
-dependency licenses.
+This project is license under the MIT license.
+
+
+Please see the license dir for dependency licenses.
 
 Docs
 -------
-API_
+ReadTheDocs_
 
-
-Full_
-
-
-.. _API: https://github.com/IntrospectData/Django-Kubernetes-Manager/blob/master/docs/openapi.md
-
-.. _Full: https://django-kubernetes-manager.readthedocs.io/en/latest/index.html
-
+.. _ReadTheDocs: https://django-kubernetes-manager.readthedocs.io/en/latest/index.html
 
 Installation
 ---------------
@@ -44,7 +39,7 @@ Getting Started
     path('dkm/', include('django_kubernetes_manager.urls')),
 
 3. To create models in your database, run::
-  
+
     python manage.py migrate
 
     * Requires Postgresql or other database with JSON support.
