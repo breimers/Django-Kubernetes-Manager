@@ -69,6 +69,7 @@ class KubernetesTelemetryMixin(models.Model):
                 memory += self.parseSize(cmem)
         return {"cpu": cpu, "memory": memory}
 
+    @property
     def status(self):
         """
         :description: Returns status data of object.

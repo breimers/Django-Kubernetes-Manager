@@ -2,6 +2,43 @@ version: 2.1
 orbs:
   python: circleci/python@0.2.1
 jobs:
+  test:
+    docker:
+      - image: circleci/python:3.8-buster  # primary container for the test job
+      - image: circleci/postgres:alpine
+        environment:
+          POSTGRES_PASSWORD: webapp-password
+          POSTGRES_USER: webapp-user
+          POSTGRES_DB: webapp-db
+    executor: python/default
+    steps:
+      - checkout
+      - run:
+          name: install dependencies
+          command: pip install -r requirements.txt
+      - run:
+          name: Install Code Climate Test Reporter
+          command: |
+            curl -L https://codeclimate.com/downloads/test-reporter/test-reporter-latest-linux-amd64 > ./cc-test-reporter
+            chmod +x ./cc-test-reporter
+      - run:
+          name: Run tests
+          command: |
+            mkdir -p coverage
+            ./cc-test-reporter before-build
+            coverage run ./manage.py test
+            coverage xml -o coverage.xml
+            cp coverage.xml coverage/coverage.xml
+      - run:
+          name: Code Climate Test Coverage
+          command: |
+            ./cc-test-reporter format-coverage -t coverage.py -o codeclimate.json
+      - store_test_results:
+          path: coverage
+      - run:
+          name: Upload coveragee
+          command: |
+            ./cc-test-reporter sum-coverage --output - codeclimate.json | ./cc-test-reporter upload-coverage --debug --input -
   docs-latest:
     docker:
       - image: curlimages/curl
@@ -36,6 +73,10 @@ jobs:
 workflows:
   main:
     jobs:
+      - test:
+          filters:
+            tags:
+              only: /^\d+\.\d+\.\d+$/
       - docs-latest:
           filters:
             branches:
@@ -49,6 +90,8 @@ workflows:
             tags:
               only: /^\d+\.\d+\.\d+$/
       - build:
+          requires:
+            - test
           filters:
             branches:
               ignore: /.*/

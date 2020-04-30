@@ -29,8 +29,7 @@ class TargetCluster(TitleSlugDescriptionModel):
     telemetry_endpoint = models.URLField(help_text="Telemetry Endpoint URL")
     telemetry_source = models.CharField(max_length=5, default="p", choices=TELEMETRY_SOURCE)
     config = JSONField(
-        help_text="Configuration data stored as an encrypted\
-        blob in the database",
+        help_text="Equivalent to .kube/config but all JSON",
         null=True,
     )
 
@@ -46,7 +45,7 @@ class TargetCluster(TitleSlugDescriptionModel):
         if not isinstance(kubeconfig, bytes):
             kubeconfig = kubeconfig.encode("utf-8")
         config_hash_str = hashlib.md5().hexdigest()[:8]
-        config_data = yaml.load(kubeconfig, Loader=yaml.FullLoader)
+        config_data = yaml.safe_load(kubeconfig, Loader=yaml.FullLoader)
         ret_val = []
         for item in config_data.get("clusters", []):
             cluster, created = TargetCluster.objects.get_or_create(title=item.get("name"), api_endpoint=item.get("cluster", {}).get("server"))

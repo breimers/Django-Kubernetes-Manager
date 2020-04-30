@@ -43,7 +43,7 @@ class KubernetesNamespace(KubernetesMetadataObjBase):
         api_response = api_instance.create_namespace(body=body,)
         self.exists = True
         self.save()
-        return str(api_response.status)
+        return str(api_response)
 
     def remove(self):
         """
@@ -53,7 +53,7 @@ class KubernetesNamespace(KubernetesMetadataObjBase):
         api_response = api_instance.delete_namespace(name=self.slug,)
         self.exists = False
         self.save()
-        return str(api_response.status)
+        return str(api_response)
 
 
 class KubernetesVolume(KubernetesBase):
@@ -114,7 +114,7 @@ class KubernetesContainer(KubernetesBase):
         blank=True,
     )
     port = models.IntegerField(default=80, help_text="Port to expose.")
-    volume_mounts = models.ManyToManyField("KubernetesVolumeMount", null=True, blank=True, help_text="Mounts for any number of volumes")
+    volume_mounts = models.ManyToManyField("KubernetesVolumeMount", blank=True, help_text="Mounts for any number of volumes")
 
     def get_obj(self):
         """
@@ -127,9 +127,11 @@ class KubernetesContainer(KubernetesBase):
             ports=[client.V1ContainerPort(container_port=self.port)],
             volume_mounts=[
                 vm.get_obj() for vm in self.volume_mounts.all()
-            ] if self.volume_mounts is not None else None,
-            command=[self.command],
-            args=self.args.split(","),
+            ] if self.volume_mounts else None,
+            command=[self.command] if self.command else None,
+            args=self.args.split(",") if self.args else None,
+            env=self.config.get("env") if self.config.get("env", None) else None,
+            env_from=self.config.get("env_from") if self.config.get("env_from", None) else None,
         )
 
 
@@ -168,7 +170,7 @@ class KubernetesConfigMap(KubernetesMetadataObjBase):
         api_response = api_instance.create_namespaced_config_map(body=body, namespace=self.namespace.slug)
         self.kuid = api_response.metadata.uid
         self.save()
-        return str(api_response.status)
+        return str(api_response)
 
     def remove(self):
         """
@@ -178,7 +180,7 @@ class KubernetesConfigMap(KubernetesMetadataObjBase):
         api_response = api_instance.delete_namespaced_config_map(name=self.slug, namespace=self.namespace.slug)
         self.kuid = None
         self.save()
-        return str(api_response.status)
+        return str(api_response)
 
 
 class KubernetesPodTemplate(KubernetesMetadataObjBase):
@@ -190,26 +192,33 @@ class KubernetesPodTemplate(KubernetesMetadataObjBase):
     :fields: volume, primary_container, secondary_container, restart_policy
     """
 
-    volumes = models.ManyToManyField("KubernetesVolume", null=True, blank=True, help_text="All volumes to be created for a pod.")
+    volumes = models.ManyToManyField("KubernetesVolume", blank=True, help_text="All volumes to be created for a pod.")
     containers = models.ManyToManyField("KubernetesContainer", help_text="All containers to be included in a pod.")
+    init_containers = models.ManyToManyField("KubernetesContainer", help_text="All containers to be included in a pod.", related_name="init_container")
     restart_policy = models.CharField(max_length=16, choices=RESTART_POLICY, default="Never", help_text="How the pod should handle restart om case of failures")
 
     def get_obj(self):
         """
         :description: Generate pod spec.
         """
-        return client.V1PodTemplateSpec(
-            metadata=client.V1ObjectMeta(name=self.slug, labels=self.labels, annotations=self.annotations),
-            spec=client.V1PodSpec(
-                volumes=[
-                    v.get_obj() for v in self.volumes.all()
-                 ] if self.volumes is not None else None,
-                containers=[
-                    c.get_obj() for c in self.containers.all()
-                ] if self.containers is not None else None,
-                restart_policy=self.restart_policy,
-            ),
-        )
+        if self.containers:
+            return client.V1PodTemplateSpec(
+                metadata=client.V1ObjectMeta(name=self.slug, labels=self.labels, annotations=self.annotations),
+                spec=client.V1PodSpec(
+                    volumes=[
+                        v.get_obj() for v in self.volumes.all()
+                     ] if self.volumes is not None else None,
+                    containers=[
+                        c.get_obj() for c in self.containers.all()
+                    ],
+                    init_containers=[
+                        i.get_obj() for i in self.init_containers.all()
+                    ] if self.init_containers is not None else None,
+                    restart_policy=self.restart_policy,
+                ),
+            )
+        else:
+            raise ValueError("Containers cannot be empty or null")
 
 
 class KubernetesDeployment(KubernetesNetworkingBase, KubernetesTelemetryMixin):
@@ -245,14 +254,19 @@ class KubernetesDeployment(KubernetesNetworkingBase, KubernetesTelemetryMixin):
         body = self.get_obj()
         api_response = api_instance.create_namespaced_deployment(body=body, namespace=self.namespace.slug)
         ticker = 0
-        while self.status().unavailable_replicas > 0:
+        while True:
+            try:
+                if self.status.available_replicas >= 1:
+                    break
+            except:
+                pass
             if ticker >= self.config.get("timeout", 60):
                 raise Exception("Timeout: no replicas available after {} ticks".format(str(ticker)))
             ticker += 1
             sleep(1)
         self.kuid = api_response.metadata.uid
         self.save()
-        return str(api_response.status)
+        return str(api_response)
 
     def remove(self):
         """
@@ -262,7 +276,7 @@ class KubernetesDeployment(KubernetesNetworkingBase, KubernetesTelemetryMixin):
         api_response = api_instance.delete_namespaced_deployment(name=self.slug, namespace=self.namespace.slug)
         self.kuid = None
         self.save()
-        return str(api_response.status)
+        return str(api_response)
 
 
 class KubernetesJob(KubernetesNetworkingBase, KubernetesTelemetryMixin):
@@ -298,7 +312,7 @@ class KubernetesJob(KubernetesNetworkingBase, KubernetesTelemetryMixin):
         api_response = api_instance.create_namespaced_job(body=body, namespace=self.namespace.slug)
         self.kuid = api_response.metadata.uid
         self.save()
-        return str(api_response.status)
+        return str(api_response)
 
     def remove(self):
         """
@@ -308,7 +322,7 @@ class KubernetesJob(KubernetesNetworkingBase, KubernetesTelemetryMixin):
         api_response = api_instance.delete_namespaced_job(name=self.slug, namespace=self.namespace.slug)
         self.kuid = None
         self.save()
-        return str(api_response.status)
+        return str(api_response)
 
 
 class KubernetesService(KubernetesNetworkingBase):
@@ -345,7 +359,7 @@ class KubernetesService(KubernetesNetworkingBase):
         api_response = api_instance.create_namespaced_service(body=body, namespace=self.namespace.slug)
         self.kuid = api_response.metadata.uid
         self.save()
-        return str(api_response.status)
+        return str(api_response)
 
     def remove(self):
         """
@@ -355,7 +369,7 @@ class KubernetesService(KubernetesNetworkingBase):
         api_response = api_instance.delete_namespaced_service(name=self.slug, namespace=self.namespace.slug)
         self.kuid = None
         self.save()
-        return str(api_response.status)
+        return str(api_response)
 
 
 class KubernetesIngress(KubernetesNetworkingBase):
@@ -406,7 +420,7 @@ class KubernetesIngress(KubernetesNetworkingBase):
         api_response = api_instance.create_namespaced_ingress(body=body, namespace=self.namespace.slug)
         self.kuid = api_response.metadata.uid
         self.save()
-        return str(api_response.status)
+        return str(api_response)
 
     def remove(self):
         """
@@ -416,4 +430,4 @@ class KubernetesIngress(KubernetesNetworkingBase):
         api_response = api_instance.delete_namespaced_ingress(name=self.slug, namespace=self.namespace.slug)
         self.kuid = None
         self.save()
-        return str(api_response.status)
+        return str(api_response)
